@@ -1,125 +1,106 @@
-# Major Specification: Nine Men's Morris (Three & Nine Men's Morris)
-### Prepared by: Sándor Máté, PM41PJ
-## Table of Contents
-1. Brief Textual Description of the Task
-2. List and Elaboration of Use Cases
-    - UC-01: Starting a New Game with Advanced Setup
-    - UC-02: Placing a Piece / Executing a Move with the Mouse
-    - UC-03: Removing a Piece After Forming a Mill
-    - UC-04: Undoing a Move
-    - UC-05: Saving and Loading Games (Standard I/O)
-    - UC-06: Detecting and Handling Game Over
-    - Sketchy Outline of the Solution Idea (Architecture)
+# Nine Men's Morris (and Three Men's Morris)
 
-3. 
-   1. Applied Technologies
+Prepared by: Sándor Máté, PM41PJ
 
-   2. Main Classes and Their Roles (Class Design)
+A graphical Java Swing implementation of the classic two-player board game, with a computer opponent.
 
-   3. Use of the Collection Framework
+## Build and run
 
-   4. Planned File Format (JSON Structure)
+Requires JDK 17 or newer and Maven.
 
-## 1. Brief Textual Description of the Task
+```
+mvn test                         # run the unit tests
+mvn package                      # build target/morris-1.0.0.jar
+java -jar target/morris-1.0.0.jar
+```
 
-The program is a modern, graphical Java Swing implementation of Nine Men's Morris, a classic board-based strategy game for two players. The goal of the game is for players to form "mills" (three pieces of the same color placed in a straight line) through the logical placement and movement of their pieces. Completing a mill grants a player the right to capture any arbitrary piece belonging to the opponent. The game ends when a player's piece count drops below the permitted minimum, or when an opponent is completely blocked, meaning they are unable to make a valid move.
+## 1. Description of the task
 
-The software supports two historical game modes:
-- Three Men's Morris: A faster, clearer variant played on a smaller 3x3 grid.
- - Nine Men's Morris: The traditional version based on three nested squares, providing a deeper tactical challenge.
+Players form *mills* (three own pieces on a straight line) by placing and then moving pieces.
 
- A standout feature of the program is its flexibility: via the Advanced menu option, users can customize opponent parameters at game start (local player or computer AI with various difficulty levels) and house rules, which the program locks in for the duration of the match. The game state can be saved and loaded at any time into a standard, human-readable JSON file. Graphical rendering is handled by a custom low-level drawing component (`Graphics2D`), ensuring smooth mouse control and a responsive game board.
-## 2. List and Elaboration of Use Cases
-### UC-01: Starting a New Game with Advanced Setup
- - Actor: Player
- - Description: The user selects the "New Game" -> "Advanced Setup" option from the menu. A dialog box appears where game parameters can be locked down:
+* **Nine Men's Morris** – three nested squares (24 nodes, 16 mill lines), 9 pieces each. Forming a mill
+  captures an opponent piece. A player loses when reduced below 3 pieces (board + hand) or when blocked.
+* **Three Men's Morris** – 3x3 board (9 nodes, 8 mill lines: rows, columns and both diagonals), 3 pieces each.
+  **There are no captures:** the first player to form a mill wins. A blocked player loses.
 
-     - Game Mode: Three Men's Morris or Nine Men's Morris.
-     - Opponent Type: Player vs. Player or Player vs. Computer (AI).
-     - AI Difficulty Level: (If AI is active) Easy, Medium, or Hard.
-     - House Rules: Selectable options (e.g., allow undo, flying rule).
+Via **New Game → Advanced Setup** the opponent (local player or computer, Easy/Medium/Hard) and the house
+rules are chosen. They are locked for the whole game. The state can be saved to / loaded from a
+human-readable JSON file. Rendering uses a custom `Graphics2D` component.
 
- - Output: The system initializes the game board with the specified settings. Note: These rules and settings cannot be modified during gameplay to prevent mid-game cheating.
+### Rules in detail
 
-### UC-02: Placing a Piece / Executing a Move with the Mouse
- - Actor: Player
- - Description: 
-     - Placement Phase: The player clicks on an empty intersection on the board (BoardPanel), and the system places their piece there.
-     - Moving Phase: The player clicks on their own piece (selection), and then clicks an adjacent empty space to relocate it.
+* White always starts. The computer, when enabled, plays Black.
+* **Placing phase:** players alternate placing one piece from their hand on an empty node.
+* **Moving phase:** once a player has no pieces in hand, they slide a piece to an adjacent empty node.
+* **Mill & removal (9MM):** completing a mill (by placing *or* moving) lets the player remove one opponent
+  piece. Pieces in a mill are protected, unless *all* opponent pieces are in mills – then any may be removed.
+* **Flying (house rule, 9MM only):** a player with exactly 3 pieces left (none in hand) may jump to any empty
+  node. The option is disabled in Three Men's Morris.
+* **Game over:** an opponent below 3 pieces (9MM), a mill (3MM), or an opponent with no legal move.
 
- - Output: The graphical interface updates immediately (`repaint()`), the piece moves to its new location, and the turn passes to the next player (or AI). If the move results in a mill, the phase shifts to the "removal" phase.
+## 2. Use cases
 
-### UC-03: Removing a Piece After Forming a Mill
- - Actor: Player
- - Description: After forming a mill, the player clicks on one of the opponent's selectable pieces (valid targets, meaning pieces not currently part of a mill).
+| ID | Use case | Summary |
+|----|----------|---------|
+| UC-01 | Start a new game with Advanced Setup | Choose mode, opponent, AI difficulty and house rules (undo, flying). Locked for the game. |
+| UC-02 | Place / move a piece with the mouse | Placing: click an empty node. Moving: click an own piece, then an adjacent empty node (all empty nodes when flying). A mill switches to the removal phase. |
+| UC-03 | Remove a piece after a mill | Click one of the highlighted (red) opponent pieces. |
+| UC-04 | Undo | Reverts the previous turn (a placement/move together with its removal). Against the computer it reverts the computer's reply as well, so it is the human's turn again. Only with the *Allow undo* rule. |
+| UC-05 | Save and load | Writes/reads the full game state and the active house rules as JSON. The undo history is not saved. |
+| UC-06 | Game over | `GameLogic` detects the end; the board stops accepting clicks and a dialog names the winner and offers a new game. |
 
- - Output: The opponent's selected piece is removed from the board and memory, and the game continues.
+## 3. Architecture
 
-### UC-04: Undoing a Move
- - Actor: Player
- - Description: The user clicks a button on the control panel to undo their previous move (provided this rule was enabled in the Advanced menu).
+### 3.1 Technologies
 
- - Output: Using an internal move history stack (`Stack`), the system restores the exact prior board state and player turn.
+Java 17+, Swing, `Graphics2D`, `java.nio.file.Files` with a hand-written JSON writer and a small parser,
+JUnit 5, Maven.
 
- ### UC-05: Saving and Loading Games (Standard I/O)
+### 3.2 Packages and classes
 
-  - Actor: Player
- - Description: Selecting the "Save" or "Load" option from the menu. When saving, the software writes the complete current game state and fixed house rules list into a JSON text file.
+| Package | Classes |
+|---------|---------|
+| `morris` | `Main` |
+| `morris.model` | enums `Player`, `GameMode`, `GamePhase` (`PLACING, MOVING, FLYING, REMOVING, FINISHED`), `HouseRule`, `OpponentType`, `AIDifficulty`; `Position` (record, node id), `Piece` (record), `Board` (`Map<Position, Piece>`), `GameState` (deep-copyable snapshot), `GameConfig` (immutable settings) |
+| `morris.logic` | `BoardTopology` (node coordinates, adjacency, mill lines for both boards), `MillChecker`, `GameLogic` (rules, turns, undo stack), `Turn` (a complete turn), `AIPlayer` |
+| `morris.controller` | `GameController` – click handling, piece selection, runs the AI in a `SwingWorker`, save/load/undo |
+| `morris.view` | `GameFrame`, `BoardPanel` (`MouseListener`, `paintComponent`), `ControlPanel`, `AdvancedSetupDialog` |
+| `morris.service` | `JsonGameManager`, `MiniJson` (parser), `SaveData`, `GameFormatException` |
 
- - Output: After loading, the graphical interface and internal data structures accurately reflect the saved snapshot.
+**Positions.** A position is the index of a node in a fixed topology rather than a free `(row, col)` pair:
+9MM uses ids 0–7 (outer ring), 8–15 (middle), 16–23 (inner), each ring clockwise from its top-left corner;
+3MM uses `id = row * 3 + col`. `BoardTopology` holds adjacency and mill lines, so `MillChecker`, the AI and
+rendering all share one source of truth. Three Men's Morris is simply a second topology.
 
- ### UC-02: Placing a Piece / Executing a Move with the Mouse
- - Actor: System / Player
- - Description: The internal logic (GameLogic) checks victory conditions after every move or capture:
-     - A player's piece count drops below the allowed minimum (2 for Three Men's Morris, 3 for Nine Men's Morris).
-     - A player is blocked (has no valid moves because all adjacent spaces are occupied).
+**Turns.** A turn is one action plus an optional removal. `GameLogic` takes a snapshot at the start of every
+turn; that stack is the undo history.
 
- - Output: The game halts, `BoardPanel` disables mouse clicks, and a pop-up window (`JOptionPane`) declares the winner, offering an option to start a new game.
-## 3. Sketchy Outline of the Solution Idea (Architecture)
-### 3.1. Applied Technologies
- - Language: Java SE (Java 17 or newer)
+**AI.** Easy: random legal turn. Medium: minimax, depth 2 turns. Hard: minimax, depth 3 turns, both with
+alpha-beta pruning. Evaluation = piece difference, open two-in-a-row lines, mobility. The search runs on a
+background thread and works on a copy of the game.
 
- - GUI Framework: Java Swing (JFrame, JPanel, JMenuBar, JMenuItem, JLabel, JButton, JOptionPane)
+### 3.3 Collections
 
- - Graphics: Low-level java.awt.Graphics and java.awt.Graphics2D API for drawing board lines and circular pieces inside a custom JPanel (BoardPanel) subclass.
+* `Map<Position, Piece>` (`HashMap`) – board contents, O(1) lookup.
+* `List<Piece>` (`ArrayList`) – pieces in hand per player (`EnumMap<Player, List<Piece>>`).
+* `Stack<GameState>` – undo history.
 
- - File Management: Standard Java I/O (java.io.PrintWriter, java.io.BufferedReader, java.nio.file.Files) processing a hand-assembled JSON structure.
+### 3.4 Save file format
 
- - Testing: JUnit 5 framework.
+`row`/`col` are the grid coordinates of the node (0–6 for 9MM, 0–2 for 3MM). Only active house rules are
+listed. `winner` is `null` unless the game is finished.
 
-### 3.2. Main Classes and Their Roles (Class Design)
- - Main / GameFrame (JFrame subclass): The main window that ties together the menu bar, information panel, and graphical game board.
-
- - BoardPanel (JPanel subclass): Implements the MouseListener interface. Handles clicks, transforms coordinates, and draws the board and pieces via the paintComponent method (Graphics2D).
-
- - GameLogic: Contains the game rules, validates moves, checks for mills, phase transitions, and game over states.
-
- - Board: The logical model of the board. Stores the mapping between positions and pieces in a Map<Position, Piece> collection.
-
- - Position: A class storing coordinates; will have hashCode() and equals() overridden for proper Map functionality.
-
- - Piece: A class representing a piece (stores its owner player).
-
- - GameSession / FileHandler: Responsible for manual JSON serialization and deserialization of the game state.
-
-### 3.3. Use of the Collection Framework
- - Map<Position, Piece> (HashMap): For mapping board positions to pieces with $O(1)$ search time.
- - List<Piece> (ArrayList): Stores pieces in hand that have not yet been placed during the placement phase.
- - Stack<GameState> (Stack): Stores move history to support the Undo feature.
-
-### 3.4. Planned File Format (JSON Structure)
-The save file (.json) will be structured and human-readable, with house rules saved as an array listing only active elements:
-
-```JSON
+```json
 {
   "gameMode": "NINE_MENS_MORRIS",
   "opponentType": "AI",
   "aiDifficulty": "MEDIUM",
   "currentTurn": "WHITE",
   "gamePhase": "MOVING",
+  "winner": null,
   "board": [
     {"row": 0, "col": 0, "player": "WHITE"},
-    {"row": 1, "col": 2, "player": "BLACK"}
+    {"row": 0, "col": 3, "player": "BLACK"}
   ],
   "whiteHandCount": 0,
   "blackHandCount": 1,
@@ -130,71 +111,12 @@ The save file (.json) will be structured and human-readable, with house rules sa
 }
 ```
 
-# Classes and Architecture Plan for Implementation
+## 4. Changes from the first version of the specification
 
-To build a robust, clean, and maintainable object-oriented structure in Java MVC (model, view, controller, and service). Here is a breakdown of the specific classes:
-## 1. model Package (Data & Business Entities)
- - Player (Enum):
-
-   - Values: WHITE, BLACK (or helper methods to get the opponent).
-
- - GameMode (Enum):
-
-   - Values: THREE_MENS_MORRIS, NINE_MENS_MORRIS.
-
- - GamePhase (Enum):
-
-   - Tracks the current state of a player's turn: PLACING, MOVING, FLYING (if enabled), REMOVING (when a mill is formed), FINISHED.
-
- - HouseRule (Enum):
-
-   - Values: UNDO_ENABLED, FLYING_ALLOWED.
-
- - Position (Class):
-
-   - Fields: int row, int col (or ring/index representation depending on your coordinate system).
-
-   - Crucial: Must override equals() and hashCode() to act safely as keys in a HashMap.
-
- - Piece (Class):
-
-   - Fields: Player owner, String id (optional for tracking).
-
- - Board (Class):
-
-   - Fields: Map<Position, Piece> grid.
-
-   - Methods: placePiece(Position pos, Piece piece), removePiece(Position pos), Piece getPiece(Position pos), boolean isEmpty(Position pos), initializeBoard(GameMode mode).
-
- - GameState (Class - for Undo/Snapshot):
-
-   - Captures a snapshot of the board map, hand counts, active player, and game phase so it can be pushed to an undo Stack.
-
-## 2. logic Package (Rules & AI)
- - GameLogic (Class):
-   - Manages core rule enforcement.
-   - Methods: isValidMove(Position from, Position to), isMill(Position pos, Player player), checkGameOver(), switchTurn().
- - MillChecker (Helper Class / Service):
-   - Contains pre-defined winning lines/adjacency matrices for both 3x3 and Nine Men's Morris grids to evaluate whether a placed/moved piece creates a mill.
- - AIPlayer (Class / Interface):
-   - Handles computer opponent decisions based on difficulty (Easy: random valid move; Medium/Hard: Minimax algorithm or heuristic blocking of opponent mills).
-
-## 3. view Package (GUI Components - Java Swing)
- - GameFrame (Extends JFrame):
-     - The main window container. Manages layouts, menus, and switches between panels (e.g., Main Menu -> Game Board).
-
- - BoardPanel (Extends JPanel, implements MouseListener):
-
-   - Handles custom rendering (paintComponent with Graphics2D) for lines, nodes, and pieces. Translates pixel mouse clicks into board Position coordinates.
-
- - ControlPanel (Extends JPanel):
-
-   - Contains buttons for "Undo", "Save", "Load", status labels displaying whose turn it is, and remaining pieces in hand.
-
- - AdvancedSetupDialog (Extends JDialog):
-
-   - A configuration pop-up window letting the user select Game Mode, Opponent Type, AI Difficulty, and House Rules before starting.
-
-## 4. service Package (I/O & Persistence)
- - JsonGameManager (Class):
-   - Handles serializing the active game configurations and board state into a custom JSON string format or reading it back to reconstruct a GameState.
+* Three Men's Morris has no captures and no minimum piece count; the first mill wins.
+* Duplicate "UC-02" renumbered: game over is UC-06.
+* Flying only applies at exactly 3 pieces, and only in Nine Men's Morris.
+* Undo reverts whole turns and, against the computer, the computer's reply too.
+* If every opponent piece is in a mill, any of them may be removed.
+* Fixed node-id positions with a topology class instead of free `(row, col)` coordinates.
+* Added a `controller` package and a `winner` field in the save file.
